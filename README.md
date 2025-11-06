@@ -1,12 +1,12 @@
 # ARG25 Project Submission
 
 ## Project Title
-ZK Tickets: Modular NFT + ZK Infrastructure for Fraud-Proof, Private Event Access
+Obscurus Protocol: Privacy-Preserving NFT and Zero-Knowledge Infrastructure
 
 ## Team
-- **Team/Individual Name:** ZK Tickets Labs  
+- **Team/Individual Name:** Obscurus Labs  
 - **GitHub Handles:** @mathigertner  
-- **Devfolio Handles:** mathigertner  
+- **Devfolio Handles:** mathigertner
 
 ---
 
