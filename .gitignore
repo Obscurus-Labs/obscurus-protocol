@@ -18,3 +18,23 @@
 
 # Hardhat coverage reports
 /coverage
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# ZK Circuit artifacts (generated files, too large for git)
+circuits/*.r1cs
+circuits/*.sym
+circuits/*.zkey
+circuits/*.wasm
+circuits/semaphore_js/
+circuits/verification_key.json
+
+# Powers of Tau files (trusted setup, very large)
+*.ptau
+pot*.ptau
+
+# Duplicate sym files
+semaphore.sym
