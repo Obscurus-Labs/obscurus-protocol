@@ -1,29 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "./TicketNFT.sol";
+import "./BaseNFT.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
-contract TicketFactory is Ownable {
+contract NFTFactory is Ownable {
     using Clones for address;
 
-    // Base implementation (initializable ERC-721) to clone
     address public implementation;
+    mapping(uint256 => address) public collectionContractOf;
+    address[] public allCollections;
 
-    // eventId => event ERC-721 contract
-    mapping(uint256 => address) public eventContractOf;
-    // list (optional) for iteration/indexing
-    address[] public allEvents;
-
-    // --- Errors and events ---
     error InvalidImplementation();
-    error EventAlreadyExists();
+    error CollectionAlreadyExists();
     error ZeroAddressOwner();
 
     event ImplementationUpdated(address indexed newImplementation);
-    event EventCreated(
-        uint256 indexed eventId,
+    event CollectionCreated(
+        uint256 indexed collectionId,
         address indexed nft,
         string name,
         string symbol
@@ -35,59 +30,54 @@ contract TicketFactory is Ownable {
         emit ImplementationUpdated(impl);
     }
 
-    // Rotate the base implementation (new audited version)
     function setImplementation(address impl) external onlyOwner {
         if (impl == address(0)) revert InvalidImplementation();
         implementation = impl;
         emit ImplementationUpdated(impl);
     }
 
-    // Deterministic address of the clone for a given eventId
-    function predictEventAddress(
-        uint256 eventId
+    function predictCollectionAddress(
+        uint256 collectionId
     ) public view returns (address) {
-        bytes32 salt = keccak256(abi.encodePacked(eventId));
+        bytes32 salt = keccak256(abi.encodePacked(collectionId));
         return implementation.predictDeterministicAddress(salt, address(this));
     }
 
-    // Creates the event ERC-721 contract (deterministic clone) and initializes its state
-    function createEvent(
-        uint256 eventId,
+    function createCollection(
+        uint256 collectionId,
         string calldata name_,
         string calldata symbol_,
-        string[] calldata ticketTypeNames_,
         string calldata baseURI_,
         string calldata contractURI_,
         address organizerOwner
     ) external onlyOwner returns (address nft) {
-        if (eventContractOf[eventId] != address(0)) revert EventAlreadyExists();
+        if (collectionContractOf[collectionId] != address(0))
+            revert CollectionAlreadyExists();
         if (organizerOwner == address(0)) revert ZeroAddressOwner();
 
-        bytes32 salt = keccak256(abi.encodePacked(eventId));
+        bytes32 salt = keccak256(abi.encodePacked(collectionId));
         nft = implementation.cloneDeterministic(salt);
 
-        TicketNFT(nft).initialize(
-            eventId,
+        BaseNFT(nft).initialize(
+            collectionId,
             name_,
             symbol_,
-            ticketTypeNames_,
             baseURI_,
             contractURI_,
             organizerOwner
         );
 
-        eventContractOf[eventId] = nft;
-        allEvents.push(nft);
+        collectionContractOf[collectionId] = nft;
+        allCollections.push(nft);
 
-        emit EventCreated(eventId, nft, name_, symbol_);
+        emit CollectionCreated(collectionId, nft, name_, symbol_);
     }
 
-    // Listing helpers
-    function getEventsCount() external view returns (uint256) {
-        return allEvents.length;
+    function getCollectionsCount() external view returns (uint256) {
+        return allCollections.length;
     }
 
-    function getEventAt(uint256 index) external view returns (address) {
-        return allEvents[index];
+    function getCollectionAt(uint256 index) external view returns (address) {
+        return allCollections[index];
     }
 }
