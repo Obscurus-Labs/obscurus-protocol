@@ -40,8 +40,9 @@ contract GroupManager {
         if (semaphoreGroupOf[id] != 0) revert GroupAlreadyInitialized();
         if (admin == address(0)) revert Unauthorized();
 
-        // according to your doc version: createGroup() returns the group id
-        uint256 semGroupId = semaphore.createGroup();
+        // Set GroupManager as the admin in Semaphore
+        // GroupManager will verify that msg.sender is the admin before calling Semaphore
+        uint256 semGroupId = semaphore.createGroup(address(this));
 
         semaphoreGroupOf[id] = semGroupId;
         groupAdmin[id] = admin;
@@ -62,6 +63,21 @@ contract GroupManager {
         emit MemberAdded(id, identityCommitment);
     }
 
+    /// @notice add multiple members (identity commitments) to that group
+    function addMembers(uint256 id, uint256[] calldata identityCommitments) external {
+        address admin = groupAdmin[id];
+        if (admin == address(0)) revert GroupNotInitialized();
+        if (admin != msg.sender) revert Unauthorized();
+        if (isFrozen[id]) revert GroupAlreadyFrozen();
+
+        uint256 semGroupId = semaphoreGroupOf[id];
+        semaphore.addMembers(semGroupId, identityCommitments);
+
+        for (uint256 i = 0; i < identityCommitments.length; i++) {
+            emit MemberAdded(id, identityCommitments[i]);
+        }
+    }
+
     /// @notice stop adding members for that group
     function freezeGroup(uint256 id) external {
         address admin = groupAdmin[id];
@@ -79,5 +95,18 @@ contract GroupManager {
         if (groupAdmin[id] == address(0)) revert GroupNotInitialized();
         uint256 semGroupId = semaphoreGroupOf[id];
         return ISemaphoreGroups(address(semaphore)).getMerkleTreeRoot(semGroupId);
+    }
+    
+    /// @notice Get the Semaphore group ID for a context ID
+    /// @param id The context ID
+    /// @return semGroupId The Semaphore group ID
+    function getSemaphoreGroupId(uint256 id) external view returns (uint256) {
+        return semaphoreGroupOf[id];
+    }
+    
+    /// @notice Get the Semaphore contract address
+    /// @return The Semaphore contract address
+    function getSemaphoreAddress() external view returns (address) {
+        return address(semaphore);
     }
 }

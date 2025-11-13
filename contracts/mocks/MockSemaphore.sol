@@ -12,6 +12,7 @@ contract MockSemaphore is ISemaphore, ISemaphoreGroups {
     mapping(uint256 => bool) private _groups;
     mapping(uint256 => uint256) private _memberCount; // Track member count per group
     mapping(uint256 => uint256) private _merkleRoots; // Store actual merkle roots
+    mapping(uint256 => address) private _groupAdmins; // Store group admins
 
     event MockGroupCreated(uint256 indexed groupId);
     event MockMemberAdded(uint256 indexed groupId, uint256 identityCommitment);
@@ -24,22 +25,25 @@ contract MockSemaphore is ISemaphore, ISemaphoreGroups {
         _groupCounter++;
         groupId = _groupCounter;
         _groups[groupId] = true;
+        _groupAdmins[groupId] = msg.sender;
         emit MockGroupCreated(groupId);
         return groupId;
     }
 
-    function createGroup(address) external override returns (uint256) {
+    function createGroup(address admin) external override returns (uint256) {
         _groupCounter++;
         uint256 groupId = _groupCounter;
         _groups[groupId] = true;
+        _groupAdmins[groupId] = admin;
         emit MockGroupCreated(groupId);
         return groupId;
     }
 
-    function createGroup(address, uint256) external override returns (uint256) {
+    function createGroup(address admin, uint256) external override returns (uint256) {
         _groupCounter++;
         uint256 groupId = _groupCounter;
         _groups[groupId] = true;
+        _groupAdmins[groupId] = admin;
         emit MockGroupCreated(groupId);
         return groupId;
     }
@@ -95,25 +99,6 @@ contract MockSemaphore is ISemaphore, ISemaphoreGroups {
         return true;
     }
     
-    function verifyProof(uint256 groupId, SemaphoreProof calldata proof) external view override returns (bool) {
-        // Check group exists (like onlyExistingGroup modifier in real Semaphore)
-        if (!_groups[groupId]) {
-            return false;
-        }
-        
-        // In mock mode, always return true if group exists
-        // We don't validate the proof itself - this is for testing only
-        return true;
-    }
-    
-    // Non-view version for use from ZKVerifier (avoids memory->calldata conversion issue)
-    function verifyProofNonView(uint256 groupId, uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] memory points) external returns (bool) {
-        if (!_groups[groupId]) {
-            return false;
-        }
-        return true;
-    }
-
     /// @dev Mock implementation of getMerkleTreeRoot (from ISemaphoreGroups)
     function getMerkleTreeRoot(uint256 groupId) external view override returns (uint256) {
         // Don't use require - return 0 if group doesn't exist (view function should not revert)
@@ -126,6 +111,38 @@ contract MockSemaphore is ISemaphore, ISemaphoreGroups {
         }
         // Return a mock root (just the groupId shifted)
         return uint256(keccak256(abi.encodePacked("MOCK_ROOT", groupId)));
+    }
+
+    function verifyProof(uint256 groupId, SemaphoreProof calldata proof) external view override returns (bool) {
+        // Check group exists (like onlyExistingGroup modifier in real Semaphore)
+        if (!_groups[groupId]) {
+            return false;
+        }
+        
+        // CRITICAL: Validate that the proof's merkleTreeRoot matches the stored root
+        // This ensures that proofs with wrong ticketType will fail
+        uint256 storedRoot = this.getMerkleTreeRoot(groupId);
+        if (proof.merkleTreeRoot != storedRoot) {
+            return false;
+        }
+        
+        // In mock mode, we skip ZK proof verification but validate the root
+        return true;
+    }
+    
+    // Non-view version for use from ZKVerifier (avoids memory->calldata conversion issue)
+    function verifyProofNonView(uint256 groupId, uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] memory points) external returns (bool) {
+        if (!_groups[groupId]) {
+            return false;
+        }
+        
+        // CRITICAL: Validate that the proof's merkleTreeRoot matches the stored root
+        uint256 storedRoot = this.getMerkleTreeRoot(groupId);
+        if (merkleTreeRoot != storedRoot) {
+            return false;
+        }
+        
+        return true;
     }
     
     /// @dev Set the merkle root for a group (for testing purposes)
@@ -144,10 +161,7 @@ contract MockSemaphore is ISemaphore, ISemaphoreGroups {
     }
     
     function getGroupAdmin(uint256 groupId) external view override returns (address) {
-        if (!_groups[groupId]) {
-            return address(0);
-        }
-        return address(0); // Mock: no admin tracking
+        return _groupAdmins[groupId];
     }
     
     function hasMember(uint256 groupId, uint256 identityCommitment) external view override returns (bool) {
