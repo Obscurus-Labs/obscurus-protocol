@@ -33,4 +33,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-
+# ZK Circuit artifacts (generated files, too large for git)
+/public/circuits/*.wasm
+/public/circuits/*.zkey
